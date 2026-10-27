@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Учёт тары «Деталь Ресурс»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Экран-сканер для телефона и ТСД: одно поле, одна карточка, крупные кнопки, нижнее меню из трёх пунктов */
+:root{
+  --bg:#f1f3f4; --panel:#ffffff; --ink:#1b2126; --muted:#5f6b74; --line:#d9dfe3;
+  --accent:#d9480f; --accent-ink:#ffffff; --steel:#33475a; --steel-ink:#ffffff;
+  --ok:#1d7a43; --warn:#9c5f08; --bad:#bb2d22;
+  --ok-bg:#e2f2e8; --warn-bg:#fbefd9; --bad-bg:#fbe4e1; --soft:#e8ecef;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#121618; --panel:#1b2125; --ink:#e4e9ec; --muted:#9aa6af; --line:#2d373e;
+  --accent:#ff7a3d; --accent-ink:#1d0b00; --steel:#a3b9ca; --steel-ink:#0f1519;
+  --ok:#4fc482; --warn:#f0a843; --bad:#f2736b;
+  --ok-bg:#15301f; --warn-bg:#33270f; --bad-bg:#3a1b19; --soft:#242c31;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(96px + env(safe-area-inset-bottom,0px))}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-block:14px 10px;flex-wrap:wrap}
+header h1{font-size:20px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px}
+.logo{height:34px;width:auto;display:block;background:#ffffff;border-radius:7px;padding:5px 6px;box-shadow:0 0 0 1px var(--line)}
+.mark{width:22px;height:22px;border-radius:4px;background:repeating-linear-gradient(-45deg,var(--accent) 0 5px,var(--steel) 5px 10px)}
+.save{font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--muted)}
+.save.on{background:var(--ok-bg);color:var(--ok)}.save.off{background:var(--bad-bg);color:var(--bad)}
+.banner{border-radius:var(--r);padding:12px 14px;font-size:14px;margin-bottom:12px;background:var(--warn-bg);border:1px solid var(--warn)}
+.banner.bad{background:var(--bad-bg);border-color:var(--bad)}
+.banner b{display:block;margin-bottom:2px}
+button{font-family:var(--f-body);font-size:16px;font-weight:600;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:12px 16px;cursor:pointer;line-height:1.2;min-height:48px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.dark{background:var(--steel);border-color:var(--steel);color:var(--steel-ink)}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button.ghost{background:transparent;border-color:transparent;color:var(--muted);min-height:40px;padding:8px 10px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.big{width:100%;font-size:18px;min-height:60px;padding:16px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > *{flex:1 1 140px}
+.note{font-size:14px;color:var(--muted)}
+h2{font-size:18px;font-weight:700;margin:0;text-wrap:balance}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{font-family:var(--f-body);font-size:16px;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);width:100%;min-width:0;min-height:48px}
+textarea{min-height:70px;resize:vertical}
+label.fld{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted);min-width:0}
+.scan{display:flex;flex-direction:column;gap:10px}
+.scan .field{display:flex;align-items:center;background:var(--panel);border:2px solid var(--steel);border-radius:var(--r);padding:0 12px}
+.scan .field:focus-within{border-color:var(--accent)}
+.scan input{border:0;font-family:var(--f-mono);font-size:20px;padding:16px 4px;background:transparent;outline:none;min-height:60px}
+.scan.batch .field{border-style:dashed;border-color:var(--accent)}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;text-align:left;font-weight:400;display:flex;flex-direction:column;min-height:auto}
+.tile .v{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .l{font-size:14px;color:var(--muted)}
+.tile .s{font-size:13px;font-weight:600;color:var(--bad)}
+.tile.alert{border-color:var(--bad)}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;font-weight:400;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-height:56px}
+.item .c{font-family:var(--f-mono);font-weight:700;font-size:16px;white-space:nowrap}
+.item .t{font-size:14px;color:var(--muted);text-align:right;min-width:0}
+.item .t b{display:block;font-weight:600}
+.item.bad{border-left:5px solid var(--bad)}.item.warn{border-left:5px solid var(--warn)}
+.list{display:flex;flex-direction:column;gap:8px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.chips button{min-height:40px;padding:8px 14px;font-size:14px;border-radius:999px;white-space:nowrap}
+.chips button[aria-pressed="true"]{background:var(--steel);border-color:var(--steel);color:var(--steel-ink)}
+.head{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+.head .code{font-family:var(--f-mono);font-size:30px;font-weight:700;line-height:1.05;word-break:break-all}
+.head .type{font-size:14px;color:var(--muted);margin-top:2px}
+.head .qr{width:76px;height:76px;background:#ffffff;border-radius:6px;padding:2px}
+.head .qr svg{width:100%;height:100%;display:block}
+.status{grid-column:1/-1;font-size:20px;font-weight:700;padding:12px 14px;border-radius:8px;background:var(--soft)}
+.status small{display:block;font-size:14px;font-weight:500;margin-top:2px}
+.status.ok{background:var(--ok-bg);color:var(--ok)}.status.warn{background:var(--warn-bg);color:var(--warn)}.status.bad{background:var(--bad-bg);color:var(--bad)}
+.status.gray{color:var(--muted)}
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.choices label{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;min-height:56px;padding:8px;border:2px solid var(--line);border-radius:var(--r);font-weight:600;font-size:15px;cursor:pointer;background:var(--panel)}
+.choices input{position:absolute;opacity:0;pointer-events:none}
+.choices label.on{border-color:var(--accent);background:var(--soft)}
+.check{display:flex;gap:12px;align-items:flex-start;font-size:15px;cursor:pointer;padding:6px 0}
+.check input{width:24px;height:24px;margin:0;flex:none;accent-color:var(--accent)}
+.check small{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.check small.crit{color:var(--bad)}
+.hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.hist li{padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+.hist li:last-child{border-bottom:0}
+.hist .w{font-size:13px;color:var(--muted)}
+.hist .d{font-size:14px;color:var(--muted)}
+.demo{font-size:11px;font-weight:600;color:var(--warn);border:1px solid var(--warn);border-radius:3px;padding:0 4px;margin-left:6px;vertical-align:3px;font-family:var(--f-body)}
+.warnline{font-size:14px;color:var(--warn);font-weight:600;margin:0}
+.menu{display:flex;flex-direction:column;gap:8px}
+.menu button{text-align:left;display:flex;flex-direction:column;gap:2px;padding:14px 16px}
+.menu button small{font-weight:400;font-size:14px;color:var(--muted)}
+.back{margin-bottom:10px}
+.confirm{border:1px solid var(--bad);background:var(--bad-bg);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px}
+nav.bottom{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:10;padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+nav.bottom div{display:flex;gap:6px;width:100%;max-width:640px}
+nav.bottom button{flex:1;border:0;background:transparent;color:var(--muted);font-size:15px;min-height:52px;border-radius:8px}
+nav.bottom button[aria-current="true"]{background:var(--soft);color:var(--ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom,0px));background:var(--ok);color:#ffffff;padding:14px 18px;border-radius:var(--r);z-index:40;font-weight:600;max-width:calc(100% - 32px);box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:16px}
+.toast.bad{background:var(--bad)}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--soft);border-radius:999px;padding:4px 4px 4px 12px;font-size:15px}
+.pill button{min-height:32px;padding:2px 10px;border-radius:999px;font-size:13px}
+a{color:var(--ink)}
+@media (prefers-reduced-motion:no-preference){.view{animation:fade .15s ease-out}@keyframes fade{from{opacity:.4;transform:translateY(4px)}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span id="logoSlot"><span class="mark" aria-hidden="true"></span></span>Учёт тары</h1>
+    <span class="save" id="save">подключение…</span>
+  </header>
+  <div id="banners"></div>
+  <main id="view" class="view"></main>
+</div>
+<nav class="bottom"><div>
+  <button data-nav="scan" aria-current="true">Сканер</button>
+  <button data-nav="list" aria-current="false">Список</button>
+  <button data-nav="more" aria-current="false">Ещё</button>
+</div></nav>
+<input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
+<div id="toastRoot"></div>
+
+<script>
+/* ========== Константы ========== */
+let APP_URL = "", SHEET_URL = "";
+/* Адрес серверной части (Google Apps Script, веб-приложение /exec) */
+const API_URL = "https://script.google.com/macros/s/AKfycbzCSLhUe7t7UTNg8T14lsqAfivnz37SyzY3bo4dKXa0HDzadRMMSkVoicG9Qw6RsDn1Sg/exec";
+/* Логотип «Деталь Ресурс»: значок — для шапки, полный — для этикеток */
+const LOGO_SRC = "data:image/png;base64,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";
+const LOGO_FULL = "data:image/png;base64,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";
+const COMPANY = "Деталь Ресурс";
+const LOC = {wh:"На складе", line:"На линии", repair:"В ремонте", client:"У клиента", scrapped:"Списана"};
+const LOC_SHORT = {wh:"Склад", line:"Линия", repair:"Ремонт", client:"Клиент", scrapped:"Списана"};
+const COND = {ok:"Годна", dirty:"Нужна мойка", broken:"Неисправна", scrapped:"Списана"};
+const ACT = {
+  create:"Введена в учёт", receive:"Принята на склад", "return":"Возврат от клиента", line:"Выдана на линию",
+  ship:"Отгружена клиенту", inspect:"Осмотр", clean:"Помыта", torepair:"Отправлена в ремонт",
+  repaired:"Ремонт выполнен", to:"Плановое ТО", scrap:"Списана", note:"Комментарий"
+};
+const DEFECTS = [
+  {t:"Трещина сварного шва", s:"crit"},
+  {t:"Погнут каркас или опоры", s:"crit"},
+  {t:"Порвана сетка или стенка", s:"crit"},
+  {t:"Не работает борт или замок", s:"crit"},
+  {t:"Острые кромки, торчит проволока", s:"crit"},
+  {t:"Вмятины, коррозия", s:"minor"},
+  {t:"Повреждена этикетка", s:"minor"},
+  {t:"Грязная: масло, стружка", s:"dirt"}
+];
+const SCRAP_REASONS = ["Износ","Не подлежит ремонту","Утеряна клиентом","Утеряна на производстве","Другое"];
+const DAY = 864e5;
+
+/* ========== Состояние ========== */
+let units=new Map(), events=[], role="guest", cfg={types:[{prefix:"MK",name:"Контейнер металлический"}],clients:[],returnDays:30,toDays:180,needPin:false,hasManagerPin:false,appUrlSet:false};
+const isManager=()=>role==="manager";
+let ready=false, conn="wait", connErr="", busy=false;
+let view="scan", openCode=null, cardEvents=[], panel=null, showOther=false, showAllHist=false, pendingCode=null;
+let listFilter="all", listQ="";
+let batch={op:"ship", rows:[]};
+let lastCreated=null;
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(5,"0");
+const fD=ms=>ms?new Date(ms).toLocaleDateString("ru-RU"):"—";
+const fT=ms=>ms?new Date(ms).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}):"";
+const fDT=ms=>ms?fD(ms)+" "+fT(ms):"—";
+const daysSince=ms=>Math.floor((Date.now()-ms)/DAY);
+const isoDay=ms=>{const d=new Date(ms);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const dayStart=v=>new Date(v+"T00:00:00").getTime();
+const plural=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;if(n>10&&n<20)return c;if(m>1&&m<5)return b;if(m===1)return a;return c};
+const lsGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const typeName=p=>(cfg.types.find(t=>t.prefix===p)||{}).name||p;
+const whoName=()=>lsGet("tara.who");
+const myPin=()=>lsGet("tara.pin");
+const demoMark=u=>u&&u.demo?`<span class="demo">демо</span>`:"";
+const sortedUnits=()=>[...units.values()].sort((a,b)=>a.code<b.code?-1:1);
+
+function toast(t,bad){const r=$("#toastRoot");r.innerHTML=`<div class="toast${bad?" bad":""}" role="status">${bad?"":"✓ "}${esc(t)}</div>`;clearTimeout(toast._t);toast._t=setTimeout(()=>r.innerHTML="",bad?4500:2600)}
+
+/* ========== Связь с сервером (Google Apps Script как JSON API) ========== */
+// POST без cookies и с text/plain — так запрос не требует входа в Google и работает в любом браузере
+async function api(fn,...args){
+  let r;
+  try{
+    r=await fetch(API_URL,{method:"POST",credentials:"omit",redirect:"follow",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({fn,args})});
+  }catch(e){throw new Error("нет связи с сервером")}
+  let j; try{j=await r.json()}catch(e){throw new Error("сервер ответил не так, как ожидалось")}
+  if(!j.ok) throw new Error(j.error||"ошибка сервера");
+  return j.data;
+}
+async function load(){
+  try{
+    const s=await api("getState",myPin());
+    units=new Map(s.units.map(u=>[u.code,u]));events=s.events;cfg=s.cfg;role=s.role;APP_URL=(s.url&&!/script\.google\.com/.test(s.url))?s.url:(location.origin+location.pathname);SHEET_URL=s.sheetUrl;
+    ready=true;setConn("on");onData();
+  }catch(e){setConn("err",e.message)}
+}
+function setConn(st,msg){conn=st;connErr=msg||"";const el=$("#save");
+  if(st==="wait"){el.className="save";el.textContent="подключение…"}
+  else if(st==="on"){el.className="save on";el.textContent="● данные сохраняются"}
+  else{el.className="save off";el.textContent="● нет связи"}
+  renderBanners();
+}
+function renderBanners(){
+  let h="";
+  if(conn==="err") h+=`<div class="banner bad"><b>Нет связи с таблицей</b>${esc(connErr)}. Проверьте интернет и обновите страницу.</div>`;
+  if(ready&&role==="guest") h+=`<div class="banner"><b>${myPin()?"PIN не подходит":"Нужен PIN"}</b>Чтобы сохранять операции, введите PIN: Ещё → Настройки.</div>`;
+  if(ready&&!whoName()&&view==="scan") h+=`<div class="banner">Укажите, кто работает на этом устройстве: Ещё → Настройки. Имя будет в истории операций.</div>`;
+  const demo=[...units.values()].filter(u=>u.demo).length;
+  if(demo&&view==="scan") h+=`<div class="banner">Сейчас в базе ${demo} ${plural(demo,"пример","примера","примеров")} с пометкой «демо». Попробуйте на них, потом удалите: Ещё → Настройки.</div>`;
+  $("#banners").innerHTML=h;
+}
+function onData(){
+  renderBanners();
+  if(pendingCode&&ready){const c=pendingCode;pendingCode=null;openCard(c);return}
+  if(view==="card") updateCard();
+  else if(view==="scan") render();
+  else if(view==="list") listBody();
+  else if(view==="batch") updateBatch();
+  else if(view==="create") updateCreateHint();
+}
+// обновление раз в 30 секунд, чтобы видеть операции других сотрудников
+setInterval(()=>{if(document.visibilityState==="visible"&&!busy&&!panel)load()},30000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy)load()});
+
+/* ========== Разбор скана ========== */
+const RU="йцукенгшщзхъфывапролджэячсмитьбюЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ№";
+const EN="qwertyuiop[]asdfghjkl;'zxcvbnm,.QWERTYUIOP{}ASDFGHJKL:\"ZXCVBNM<>#";
+function fixLayout(s){return [...s].map(ch=>{const i=RU.indexOf(ch);return i>=0?EN[i]:ch}).join("")}
+function parseCode(raw){
+  let s=String(raw||"").trim(); if(!s) return null;
+  if(/[а-яё№]/i.test(s)) s=fixLayout(s);
+  const q=s.match(/[?&#]c=([^&#\s]+)/i); if(q) s=q[1];
+  else if(/^https?:/i.test(s)) return null;
+  s=decodeURIComponent(s).toUpperCase();
+  let m=s.match(/([A-Z]{1,4})[-_ ]?0*(\d{1,6})/);
+  if(m) return m[1]+"-"+pad(+m[2]);
+  m=s.match(/^0*(\d{1,6})$/);
+  if(m&&cfg.types.length===1) return cfg.types[0].prefix+"-"+pad(+m[1]);
+  return null;
+}
+
+/* ========== QR ========== */
+function qrSvg(text){
+  if(typeof qrcode!=="function") return `<svg viewBox="0 0 10 10"></svg>`;
+  const q=qrcode(0,"M"); q.addData(text); q.make();
+  const n=q.getModuleCount(); let d="";
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++) if(q.isDark(r,c)) d+=`M${c} ${r}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 ${n+4} ${n+4}" shape-rendering="crispEdges" role="img" aria-label="QR-код"><rect x="-2" y="-2" width="${n+4}" height="${n+4}" fill="#ffffff"/><path d="${d}" fill="#000000"/></svg>`;
+}
+const qrText=code=>APP_URL?APP_URL+"?c="+code:code;
+
+/* ========== Правила (подсказки в интерфейсе; окончательную проверку делает сервер) ========== */
+function flags(u){
+  const f=[]; const now=Date.now();
+  if(!u||u.loc==="scrapped") return f;
+  if(u.loc==="client"&&u.ship&&u.ship.due&&u.ship.due<now) f.push({lvl:"bad",t:`Просрочен возврат на ${daysSince(u.ship.due)} дн.`});
+  if(u.cond==="broken"&&u.loc!=="repair") f.push({lvl:"bad",t:"Неисправна — отправьте в ремонт"});
+  if(u.cond==="dirty"&&u.loc!=="client") f.push({lvl:"warn",t:"Нужна мойка"});
+  if(u.loc!=="client"&&cfg.toDays&&now-(u.lastTO||u.created||now)>cfg.toDays*DAY) f.push({lvl:"warn",t:"Пора делать плановое ТО"});
+  return f;
+}
+function whyNot(u,act){
+  if(!u) return "нет в учёте";
+  if(u.loc==="scrapped"&&act!=="note") return "тара списана";
+  switch(act){
+    case "receive": return u.loc==="wh"?"уже на складе":null;
+    case "line": return u.loc!=="wh"?"выдать можно только со склада":null;
+    case "ship": return (u.loc==="wh"||u.loc==="line")?null:"сейчас: "+LOC[u.loc].toLowerCase();
+    case "clean": return u.loc==="client"?"тара у клиента":(u.cond!=="dirty"?"не отмечена как грязная":null);
+    case "torepair": return u.loc==="repair"?"уже в ремонте":(u.loc==="client"?"тара у клиента":null);
+    case "repaired": return u.loc!=="repair"?"не в ремонте":null;
+    case "to": case "inspect": return u.loc==="client"?"тара у клиента":null;
+  }
+  return null;
+}
+function softWarn(u,act){
+  if((act==="line"||act==="ship")&&u.cond==="broken") return "Тара отмечена как неисправная";
+  if((act==="line"||act==="ship")&&u.cond==="dirty") return "Тара не помыта";
+  return "";
+}
+
+/* ========== Навигация ========== */
+document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>go(b.dataset.nav));
+function go(v){
+  if(v!=="card"){openCode=null;panel=null}
+  view=v;
+  const top={scan:"scan",card:"scan",list:"list"}[v]||"more";
+  document.querySelectorAll("[data-nav]").forEach(b=>b.setAttribute("aria-current",b.dataset.nav===top));
+  renderBanners(); render(); window.scrollTo(0,0);
+}
+function render(){
+  ({scan:renderScan,list:renderList,more:renderMore,create:renderCreate,labels:renderLabels,batch:renderBatch,reports:renderReports,settings:renderSettings,card:()=>{}})[view]();
+}
+function scanBox(batchMode){
+  return `<form class="scan${batchMode?" batch":""}" id="scanForm" autocomplete="off">
+    <label class="field" for="scanInput"><input id="scanInput" type="text" placeholder="${batchMode?"Сканируйте тару подряд":"Номер тары, напр. MK-00007"}" aria-label="Номер тары"></label>
+    <div class="row"><button type="button" class="dark" id="camBtn">Сканировать камерой</button><button type="submit">Найти</button></div>
+  </form>`;
+}
+function bindScan(){
+  const f=$("#scanForm"); if(!f) return;
+  f.onsubmit=e=>{e.preventDefault();const i=$("#scanInput");const v=i.value;i.value="";if(v.trim())handleScan(v)};
+  $("#camBtn").onclick=()=>$("#photoInput").click();
+}
+function bindChoices(root){root.querySelectorAll(".choices").forEach(g=>{const sync=()=>g.querySelectorAll("label").forEach(l=>l.classList.toggle("on",l.querySelector("input").checked));g.querySelectorAll("input").forEach(i=>i.addEventListener("change",sync));sync()})}
+
+/* ---------- Сканер (главный экран) ---------- */
+function renderScan(){
+  const V=$("#view");
+  const typed=($("#scanInput")||{}).value||"";
+  const act=[...units.values()].filter(u=>u.loc!=="scrapped");
+  const n=l=>act.filter(u=>u.loc===l).length;
+  const od=act.filter(u=>u.loc==="client"&&u.ship&&u.ship.due<Date.now()).length;
+  const att=act.filter(u=>flags(u).length).sort((a,b)=>(flags(b).some(f=>f.lvl==="bad")?1:0)-(flags(a).some(f=>f.lvl==="bad")?1:0));
+  V.innerHTML=`<div class="stack">
+    ${scanBox(false)}
+    <p class="note" style="margin:0">ТСД: нажмите курок сканера. Телефон: наведите камеру на QR-код контейнера.</p>
+    ${ready?`<div class="tiles">
+      <button class="tile" data-flt="wh"><span class="v">${n("wh")}</span><span class="l">на складе</span></button>
+      <button class="tile" data-flt="line"><span class="v">${n("line")}</span><span class="l">на линии</span></button>
+      <button class="tile ${od?"alert":""}" data-flt="client"><span class="v">${n("client")}</span><span class="l">у клиентов</span>${od?`<span class="s">просрочено: ${od}</span>`:""}</button>
+      <button class="tile ${att.length?"alert":""}" data-flt="att"><span class="v">${att.length}</span><span class="l">требуют внимания</span></button>
+    </div>
+    ${att.length?`<h2 style="margin-top:6px">Требует внимания</h2><div class="list">${att.slice(0,5).map(itemHtml).join("")}</div>${att.length>5?`<button class="ghost" data-flt="att">Показать все (${att.length})</button>`:""}`:""}
+    ${!act.length?`<div class="card"><h2>Тары в учёте пока нет</h2><p class="note" style="margin:0">Введите первые контейнеры: Ещё → Ввести новую тару.</p><button class="primary" data-go="create">Ввести тару</button></div>`:""}`
+    :`<p class="note">${conn==="wait"?"Загружаю…":""}</p>`}
+  </div>`;
+  bindScan();
+  const i=$("#scanInput"); i.value=typed;
+  if(!matchMedia("(pointer:coarse)").matches) i.focus();
+}
+function statusOf(u){
+  if(u.loc==="scrapped") return {cls:"gray",t:"Списана",s:""};
+  const f=flags(u);
+  let t=LOC[u.loc], s="";
+  if(u.loc==="client"){t="У клиента: "+(u.client||"");s=u.ship?`вернуть до ${fD(u.ship.due)}`+(u.ship.doc?` · накл. ${u.ship.doc}`:""):""}
+  const cls=f.some(x=>x.lvl==="bad")?"bad":f.length?"warn":"ok";
+  return {cls,t:t+" · "+COND[u.cond],s:f.length?f.map(x=>x.t).join(" · "):s};
+}
+function itemHtml(u){
+  const f=flags(u), st=u.loc==="client"?"Клиент: "+(u.client||""):LOC_SHORT[u.loc];
+  return `<button class="item ${f.some(x=>x.lvl==="bad")?"bad":f.length?"warn":""}" data-open="${esc(u.code)}"><span class="c">${esc(u.code)}${demoMark(u)}</span><span class="t"><b>${esc(st)} · ${esc(COND[u.cond])}</b>${f.length?esc(f[0].t):""}</span></button>`;
+}
+
+/* ---------- Карточка тары ---------- */
+function handleScan(raw){
+  const code=parseCode(raw);
+  if(!code){toast("Не удалось распознать номер",1);return}
+  if(view==="batch"){batchAdd(code);return}
+  openCard(code);
+}
+function openCard(code){
+  if(!ready){pendingCode=code;return}
+  if(!units.has(code)){toast(code+" нет в учёте",1);return}
+  view="card";openCode=code;panel=null;showOther=false;showAllHist=false;cardEvents=[];
+  document.querySelectorAll("[data-nav]").forEach(b=>b.setAttribute("aria-current",b.dataset.nav==="scan"));
+  renderBanners();
+  $("#view").innerHTML=`<div class="stack">
+    <button class="ghost back" data-nav2="scan" style="align-self:flex-start">← К сканеру</button>
+    <div id="cHead"></div><div id="cActs" class="stack"></div><div id="cPanel"></div>
+    <div class="card"><h2>История</h2><div id="cHist"><p class="note">Загружаю…</p></div></div>
+  </div>`;
+  updateCard(); window.scrollTo(0,0); loadHist();
+}
+async function loadHist(){
+  const code=openCode;
+  try{const h=await api("getHistory",code);if(openCode===code){cardEvents=h;renderHist()}}
+  catch(e){const el=$("#cHist");if(el)el.innerHTML=`<p class="note">Не удалось загрузить историю.</p>`}
+}
+const ACT_UI={
+  receive:u=>u.loc==="client"?"Принять возврат от клиента":"Вернуть на склад",
+  line:()=>"Выдать на линию", ship:()=>"Отгрузить клиенту", repaired:()=>"Ремонт выполнен",
+  torepair:()=>"Отправить в ремонт", clean:()=>"Помыта", inspect:()=>"Осмотр",
+  to:()=>"Плановое ТО выполнено", note:()=>"Комментарий", scrap:()=>"Списать"
+};
+function mainActs(u){
+  if(u.loc==="scrapped") return [];
+  const a=[];
+  if(u.cond==="broken"&&u.loc!=="repair"&&u.loc!=="client") a.push("torepair");
+  if(u.cond==="dirty"&&u.loc!=="client") a.push("clean");
+  if(u.loc==="client") a.push("receive");
+  else if(u.loc==="repair") a.push("repaired");
+  else if(u.loc==="wh") a.push("line","ship");
+  else if(u.loc==="line") a.push("receive","ship");
+  return a.slice(0,3);
+}
+function updateCard(){
+  const u=units.get(openCode);
+  if(!u){$("#cHead").innerHTML=`<div class="card">Единица удалена из базы.</div>`;$("#cActs").innerHTML="";return}
+  const st=statusOf(u);
+  $("#cHead").innerHTML=`<div class="head"><div style="min-width:0"><div class="code">${esc(u.code)}${demoMark(u)}</div><div class="type">${esc(typeName(u.type))}</div></div>
+    <div class="qr">${qrSvg(qrText(u.code))}</div>
+    <div class="status ${st.cls}">${esc(st.t)}${st.s?`<small>${esc(st.s)}</small>`:""}</div></div>`;
+  const main=mainActs(u);
+  const other=["inspect","to","torepair","note","scrap"].filter(a=>!main.includes(a)&&!whyNot(u,a));
+  $("#cActs").innerHTML=(u.loc==="scrapped"?"":
+    main.map((a,i)=>`<button class="big ${i===0?"primary":""}" data-pan="${a}">${esc(ACT_UI[a](u))}</button>`).join("")+
+    `<button class="ghost" id="otherBtn" style="align-self:flex-start">${showOther?"Скрыть":"Другие действия"} ▾</button>`+
+    (showOther?`<div class="row">${other.map(a=>`<button class="${a==="scrap"?"danger":""}" data-pan="${a}">${esc(ACT_UI[a](u))}</button>`).join("")}<button data-label="${esc(u.code)}">Этикетка (PDF)</button></div>`:""));
+  const ob=$("#otherBtn"); if(ob) ob.onclick=()=>{showOther=!showOther;updateCard()};
+  if(panel&&whyNot(u,panel)){panel=null;$("#cPanel").innerHTML=""}
+}
+function clientOptions(){return cfg.clients.map(c=>`<option>${esc(c)}</option>`).join("")+`<option value="__new">+ Новый клиент…</option>`}
+function condChoices(name,def){return `<div class="choices">${["ok","dirty","broken"].map(c=>`<label><input type="radio" name="${name}" value="${c}" ${c===def?"checked":""}>${COND[c]}</label>`).join("")}</div>`}
+function setPanel(a){
+  const u=units.get(openCode); panel=a; const P=$("#cPanel");
+  const w=softWarn(u,a); let body="";
+  const note=`<label class="fld">Комментарий (необязательно)<input type="text" id="pNote"></label>`;
+  if(a==="receive") body=`<div class="note">В каком состоянии тара?</div>${condChoices("pCond","ok")}`;
+  else if(a==="ship") body=`<label class="fld">Клиент<select id="pClient">${clientOptions()}</select></label><label class="fld" id="pNewWrap" hidden>Название клиента<input type="text" id="pNew"></label><label class="fld">Номер накладной<input type="text" id="pDoc" inputmode="numeric"></label><label class="fld">Вернуть до<input type="date" id="pDue" value="${isoDay(Date.now()+cfg.returnDays*DAY)}"></label>`;
+  else if(a==="inspect") body=`<div class="note">Отметьте, что нашли. Если ничего — тара годна.</div>${DEFECTS.map((d,i)=>`<label class="check"><input type="checkbox" value="${i}" data-sev="${d.s}"><span>${esc(d.t)}<small class="${d.s==="crit"?"crit":""}">${d.s==="crit"?"в ремонт":d.s==="dirt"?"на мойку":"можно работать"}</small></span></label>`).join("")}<div class="note">Итог</div>${condChoices("pCond","ok")}${note}`;
+  else if(a==="torepair") body=`<label class="fld">Что сломано<input type="text" id="pNote"></label>`;
+  else if(a==="repaired") body=`<label class="fld">Что сделали (необязательно)<input type="text" id="pNote"></label>`;
+  else if(a==="note") body=`<label class="fld">Текст<textarea id="pNote"></textarea></label>`;
+  else if(a==="scrap") body=`<label class="fld">Причина<select id="pReason">${SCRAP_REASONS.map(r=>`<option>${r}</option>`).join("")}</select></label><label class="fld">Номер акта (если есть)<input type="text" id="pDoc"></label><p class="warnline">Списание нельзя отменить.</p>`;
+  P.innerHTML=`<div class="card"><h2>${esc(ACT_UI[a](u))}</h2>${w?`<p class="warnline">⚠ ${esc(w)}</p>`:""}${body}
+    <button class="big ${a==="scrap"?"danger":"primary"}" id="pGo">${a==="scrap"?"Списать":"Сохранить"}</button><button class="ghost" id="pCancel">Отмена</button></div>`;
+  bindChoices(P);
+  $("#pCancel").onclick=()=>{panel=null;P.innerHTML=""};
+  $("#pGo").onclick=submitPanel;
+  const pc=$("#pClient"); if(pc){const t=()=>{$("#pNewWrap").hidden=pc.value!=="__new"};pc.onchange=t;t()}
+  if(a==="inspect") P.querySelectorAll(".check input").forEach(cb=>cb.onchange=()=>{
+    const ch=[...P.querySelectorAll(".check input:checked")];const r=ch.some(x=>x.dataset.sev==="crit")?"broken":ch.some(x=>x.dataset.sev==="dirt")?"dirty":"ok";
+    const rb=P.querySelector(`input[name=pCond][value=${r}]`);rb.checked=true;rb.dispatchEvent(new Event("change"))});
+  P.scrollIntoView({block:"start",behavior:"smooth"});
+}
+async function submitPanel(){
+  const a=panel,code=openCode,P=$("#cPanel"),p={note:(($("#pNote")||{}).value||"").trim()};
+  if(a==="receive"||a==="inspect") p.cond=(P.querySelector("input[name=pCond]:checked")||{}).value||"ok";
+  if(a==="inspect") p.defects=[...P.querySelectorAll(".check input:checked")].map(x=>DEFECTS[+x.value].t);
+  if(a==="ship"){let c=$("#pClient").value;if(c==="__new")c=$("#pNew").value.trim();
+    if(!c){toast("Выберите клиента",1);return}
+    p.client=c;p.doc=$("#pDoc").value.trim();const d=$("#pDue").value;p.due=d?dayStart(d)+DAY-1:null}
+  if(a==="scrap"){p.reason=$("#pReason").value;p.doc=$("#pDoc").value.trim()}
+  if(a==="torepair"&&!p.note){toast("Напишите, что сломано",1);return}
+  if(a==="note"&&!p.note){toast("Напишите комментарий",1);return}
+  const b=$("#pGo");b.disabled=true;b.textContent="Сохраняю…";busy=true;
+  try{
+    const r=await api("doAction",code,a,p,whoName(),myPin());
+    toast(`${code}: ${ACT[r.evAct].toLowerCase()}`);panel=null;P.innerHTML="";
+    await load(); loadHist();
+  }catch(e){toast("Не сохранено: "+e.message,1);b.disabled=false;b.textContent="Сохранить"}
+  busy=false;
+}
+function renderHist(){
+  const h=$("#cHist"); if(!h) return;
+  if(!cardEvents.length){h.innerHTML=`<p class="note">Операций пока нет.</p>`;return}
+  const list=showAllHist?cardEvents:cardEvents.slice(0,5);
+  h.innerHTML=`<ul class="hist">${list.map(e=>{const det=[];
+    if((e.act==="ship"||e.act==="return")&&e.client) det.push(e.client);
+    if(e.doc) det.push((e.act==="scrap"?"акт ":"накл. ")+e.doc);
+    if(e.reason) det.push(e.reason);
+    if(["inspect","return","receive"].includes(e.act)&&e.cond) det.push(COND[e.cond]||e.cond);
+    if(e.defects&&e.defects.length) det.push(e.defects.join(", "));
+    if(e.note) det.push("«"+e.note+"»");
+    return `<li><b>${esc(ACT[e.act]||e.act)}</b>${det.length?`<div class="d">${esc(det.join(" · "))}</div>`:""}<div class="w">${fDT(e.ts)}${e.who?" · "+esc(e.who):""}</div></li>`}).join("")}</ul>
+    ${cardEvents.length>5?`<button class="ghost" id="histMore">${showAllHist?"Свернуть":"Вся история ("+cardEvents.length+")"}</button>`:""}`;
+  const m=$("#histMore"); if(m) m.onclick=()=>{showAllHist=!showAllHist;renderHist()};
+}
+
+/* ---------- Список ---------- */
+const FILTERS={all:"Все",wh:"Склад",line:"Линия",client:"У клиентов",repair:"Ремонт",att:"Внимание",scrapped:"Списанные"};
+function renderList(){
+  $("#view").innerHTML=`<div class="stack">
+    <input type="text" id="lq" placeholder="Поиск: номер, клиент, накладная" value="${esc(listQ)}">
+    <div class="chips">${Object.entries(FILTERS).map(([k,v])=>`<button data-lf="${k}" aria-pressed="${listFilter===k}">${v}</button>`).join("")}</div>
+    <div id="lBody"></div></div>`;
+  $("#lq").oninput=e=>{listQ=e.target.value;listBody()};
+  listBody();
+}
+function listBody(){
+  const el=$("#lBody"); if(!el) return;
+  const q=listQ.trim().toLowerCase();
+  const list=sortedUnits().filter(u=>{
+    if(listFilter==="scrapped"){if(u.loc!=="scrapped")return false}
+    else if(u.loc==="scrapped") return false;
+    if(listFilter==="att"&&!flags(u).length) return false;
+    if(["wh","line","client","repair"].includes(listFilter)&&u.loc!==listFilter) return false;
+    if(q&&![u.code,u.client,u.ship&&u.ship.doc,u.note].join(" ").toLowerCase().includes(q)) return false;
+    return true;
+  });
+  el.innerHTML=!ready?`<p class="note">Загружаю…</p>`:list.length?`<p class="note" style="margin:0 0 8px">${list.length} шт.</p><div class="list">${list.map(itemHtml).join("")}</div>`:`<p class="note">Ничего не найдено.</p>`;
+}
+
+/* ---------- Ещё ---------- */
+function renderMore(){
+  $("#view").innerHTML=`<div class="menu">
+    <button data-go="create">Ввести новую тару<small>Присвоить номера новым контейнерам</small></button>
+    <button data-go="labels">Этикетки с QR-кодом<small>Скачать PDF для печати</small></button>
+    <button data-go="batch">Отгрузка или приёмка партией<small>Отсканировать много контейнеров под одну накладную</small></button>
+    ${isManager()?`<button data-go="reports">Выгрузить в Excel<small>Остатки, движение, акт списания, долги клиентов</small></button>`:""}
+    <button data-go="settings">Настройки<small>${isManager()?"PIN, клиенты, сроки, типы тары, демо-данные":"Кто работает, PIN"}</small></button>
+  </div>`;
+}
+const backBtn=`<button class="ghost back" data-nav2="more">← Назад</button>`;
+
+/* ---------- Ввод тары ---------- */
+function maxNum(prefix){let m=0;for(const u of units.values()){if(u.code.startsWith(prefix+"-")){const n=+u.code.split("-")[1];if(n>m)m=n}}return m}
+function renderCreate(){
+  $("#view").innerHTML=`${backBtn}<div class="card"><h2>Ввести новую тару</h2>
+    <label class="fld">Тип<select id="nType">${cfg.types.map(t=>`<option value="${esc(t.prefix)}">${esc(t.name)}</option>`).join("")}</select></label>
+    <label class="fld">Сколько штук<input type="number" id="nQty" min="1" max="200" value="10" inputmode="numeric"></label>
+    <label class="fld">Примечание (партия, поставщик)<input type="text" id="nNote"></label>
+    <p class="note" id="nHint" style="margin:0"></p>
+    <button class="big primary" id="nGo">Ввести в учёт</button></div>`;
+  $("#nType").onchange=updateCreateHint;$("#nQty").oninput=updateCreateHint;$("#nGo").onclick=createUnits;
+  updateCreateHint();
+}
+function updateCreateHint(){const h=$("#nHint");if(!h)return;const p=$("#nType").value,q=Math.max(1,Math.min(200,+$("#nQty").value||1)),m=maxNum(p);h.textContent=ready?`Номера: ${p}-${pad(m+1)} … ${p}-${pad(m+q)}`:""}
+async function createUnits(){
+  const p=$("#nType").value,q=Math.max(1,Math.min(200,+$("#nQty").value||1)),note=$("#nNote").value.trim();
+  const b=$("#nGo");b.disabled=true;b.textContent="Сохраняю…";busy=true;
+  try{const r=await api("createUnits",p,q,note,whoName(),myPin());
+    toast(`Введено: ${r.to-r.from+1} шт. Теперь распечатайте этикетки`);
+    lastCreated=r; await load(); busy=false; go("labels");
+  }catch(e){toast("Не сохранено: "+e.message,1);b.disabled=false;b.textContent="Ввести в учёт";busy=false}
+}
+
+/* ---------- Этикетки (PDF) ---------- */
+function renderLabels(){
+  const lc=lastCreated, p=lc?lc.prefix:cfg.types[0].prefix;
+  $("#view").innerHTML=`${backBtn}<div class="card"><h2>Этикетки с QR-кодом</h2>
+    <label class="fld">Тип<select id="lType">${cfg.types.map(t=>`<option value="${esc(t.prefix)}" ${t.prefix===p?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>
+    <div class="row"><label class="fld">С номера<input type="number" id="lFrom" min="1" value="${lc?lc.from:1}" inputmode="numeric"></label><label class="fld">По номер<input type="number" id="lTo" min="1" value="${lc?lc.to:(maxNum(p)||1)}" inputmode="numeric"></label></div>
+    <label class="fld">Размер<select id="lFmt"><option value="t58">Термопринтер 58×40 мм</option><option value="t100">Термопринтер 100×70 мм</option><option value="a4">Лист A4, 21 этикетка 70×42 мм</option></select></label>
+    <button class="big primary" id="lGo">Скачать PDF</button>
+    <p class="note" style="margin:0;word-break:break-all">QR ведёт на: ${esc(qrText("MK-00001"))}</p>
+    <p class="note" style="margin:0">Откройте PDF и распечатайте в масштабе 100% («Фактический размер»). Для цеха берите полиэстеровые этикетки — бумага быстро сотрётся.</p></div>`;
+  $("#lGo").onclick=e=>labelsPdf(labelCodes(),$("#lFmt").value,e.target);
+}
+function labelCodes(){const p=$("#lType").value,a=+$("#lFrom").value||1,b=+$("#lTo").value||a;const out=[];for(let i=Math.min(a,b);i<=Math.max(a,b)&&out.length<500;i++){const c=p+"-"+pad(i);if(units.has(c))out.push(c)}return out}
+const loadImg=src=>new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>res(null);im.src=src});
+// QR векторными прямоугольниками — чёткий при любом размере печати
+function pdfQr(doc,text,x,y,size){
+  const q=qrcode(0,"M");q.addData(text);q.make();
+  const n=q.getModuleCount(),c=size/(n+4);
+  doc.setFillColor(0,0,0);
+  for(let r=0;r<n;r++){let run=-1;
+    for(let k=0;k<=n;k++){const dark=k<n&&q.isDark(r,k);
+      if(dark&&run<0)run=k;
+      if(!dark&&run>=0){doc.rect(x+(run+2)*c,y+(r+2)*c,(k-run)*c+0.02,c+0.02,"F");run=-1}}}
+}
+// Текстовая часть этикетки рисуется картинкой — так кириллица печатается без встраивания шрифтов
+function labelText(code,type,w,h,logo){
+  const S=12,W=Math.round(w*S),H=Math.round(h*S),cv=document.createElement("canvas");cv.width=W;cv.height=H;
+  const x=cv.getContext("2d");x.fillStyle="#ffffff";x.fillRect(0,0,W,H);x.fillStyle="#111111";x.textBaseline="top";
+  let fs=H*0.2;x.font=`700 ${fs}px "JetBrains Mono",monospace`;while(x.measureText(code).width>W&&fs>8){fs-=1;x.font=`700 ${fs}px "JetBrains Mono",monospace`}
+  x.fillText(code,0,0);
+  let y=fs*1.25,ts=H*0.085;x.font=`500 ${ts}px "Golos Text",Arial,sans-serif`;
+  const words=String(type).split(" ");let line="",lines=[];
+  for(const wd of words){const t=line?line+" "+wd:wd;if(x.measureText(t).width>W&&line){lines.push(line);line=wd}else line=t}
+  if(line)lines.push(line);
+  lines.slice(0,2).forEach(l=>{x.fillText(l,0,y);y+=ts*1.2});
+  const ns=H*0.07;x.font=`500 ${ns}px "Golos Text",Arial,sans-serif`;x.fillStyle="#333333";
+  x.fillText("Собственность. Подлежит возврату",0,H-ns*1.15,W);
+  if(logo){const lw=Math.min(W,(H*0.3)*logo.width/logo.height),lh=lw*logo.height/logo.width;x.drawImage(logo,0,H-ns*1.5-lh,lw,lh)}
+  return cv.toDataURL("image/png");
+}
+async function labelsPdf(codes,fmt,btn){
+  if(!codes.length){toast("В этом диапазоне нет тары",1);return}
+  if(!window.jspdf||typeof qrcode!=="function"){toast("Модуль PDF не загрузился — обновите страницу",1);return}
+  const old=btn?btn.textContent:"";if(btn){btn.disabled=true;btn.textContent="Готовлю PDF…"}
+  try{
+    if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+    const logo=await loadImg(LOGO_FULL);
+    const {jsPDF}=window.jspdf;
+    const F={t58:{w:58,h:40,q:26,qx:2,qy:7,tx:30,ty:3,tw:26,th:34},
+             t100:{w:100,h:70,q:56,qx:3,qy:7,tx:62,ty:6,tw:35,th:58},
+             a4:{w:70,h:42.4,q:30,qx:3,qy:6.2,tx:35,ty:3,tw:32,th:36.4}}[fmt];
+    const doc=fmt==="a4"?new jsPDF({unit:"mm",format:"a4"}):new jsPDF({unit:"mm",format:[F.w,F.h],orientation:"l"});
+    for(let i=0;i<codes.length;i++){
+      let ox=0,oy=0;
+      if(fmt==="a4"){const k=i%21;if(k===0&&i>0)doc.addPage();ox=(k%3)*70;oy=0.6+Math.floor(k/3)*42.4}
+      else if(i>0) doc.addPage([F.w,F.h],"l");
+      const code=codes[i],u=units.get(code)||{};
+      pdfQr(doc,qrText(code),ox+F.qx,oy+F.qy,F.q);
+      doc.addImage(labelText(code,typeName(u.type),F.tw,F.th,logo),"PNG",ox+F.tx,oy+F.ty,F.tw,F.th,undefined,"FAST");
+      if(i%20===19){if(btn)btn.textContent=`Готовлю PDF… ${i+1} из ${codes.length}`;await new Promise(r=>setTimeout(r,0))}
+    }
+    saveFile(`Этикетки ${codes[0]}-${codes[codes.length-1]}.pdf`,doc.output("blob"));
+    toast(`PDF готов: ${codes.length} шт.`);
+  }catch(e){toast("Не удалось сделать PDF: "+(e.message||e),1)}
+  if(btn){btn.disabled=false;btn.textContent=old}
+}
+
+/* ---------- Партия ---------- */
+const BATCH_OPS={ship:"Отгрузить клиенту",receive:"Принять на склад / возврат",line:"Выдать на линию",clean:"Помыты"};
+function renderBatch(){
+  $("#view").innerHTML=`${backBtn}<div class="stack"><div class="card"><h2>Партия</h2>
+    <label class="fld">Что делаем<select id="bOp">${Object.entries(BATCH_OPS).map(([k,v])=>`<option value="${k}" ${k===batch.op?"selected":""}>${v}</option>`).join("")}</select></label>
+    <div id="bParams" class="stack"></div></div>
+    ${scanBox(true)}
+    <div id="bList"></div>
+    <button class="big primary" id="bGo">Сохранить партию</button></div>`;
+  $("#bOp").onchange=e=>{batch.op=e.target.value;bParams();updateBatch()};
+  $("#bGo").onclick=runBatch;
+  bindScan();bParams();updateBatch();
+}
+function bParams(){
+  const p=$("#bParams");
+  if(batch.op==="ship") p.innerHTML=`<label class="fld">Клиент<select id="bClient">${clientOptions()}</select></label><label class="fld" id="bNewWrap" hidden>Название клиента<input type="text" id="bNew"></label><div class="row"><label class="fld">Накладная №<input type="text" id="bDoc"></label><label class="fld">Вернуть до<input type="date" id="bDue" value="${isoDay(Date.now()+cfg.returnDays*DAY)}"></label></div>`;
+  else if(batch.op==="receive") p.innerHTML=`<div class="note">Состояние</div>${condChoices("bCond","ok")}`;
+  else p.innerHTML="";
+  bindChoices(p);
+  const bc=$("#bClient"); if(bc){const t=()=>{$("#bNewWrap").hidden=bc.value!=="__new"};bc.onchange=t;t()}
+}
+function batchAdd(code){if(batch.rows.some(r=>r.code===code)){toast(code+" уже в списке",1);return}batch.rows.unshift({code,state:"new"});updateBatch()}
+function updateBatch(){
+  const el=$("#bList"); if(!el) return; let okN=0;
+  el.innerHTML=batch.rows.length?`<p class="note" style="margin:0 0 8px">Отсканировано: ${batch.rows.length}</p><div class="list">${batch.rows.map(r=>{const u=units.get(r.code);const why=r.state==="done"?null:whyNot(u,batch.op);if(!why&&r.state==="new")okN++;
+    return `<div class="item ${r.state==="done"?"":why||r.state==="err"?"bad":""}"><span class="c">${esc(r.code)}</span><span class="t"><b>${r.state==="done"?"✓ сохранено":why?esc(why):r.state==="err"?esc(r.msg):"готово"}</b></span><button class="ghost" data-brm="${esc(r.code)}" aria-label="Убрать">✕</button></div>`}).join("")}</div>`:`<p class="note">Сканируйте контейнеры по одному — они появятся здесь.</p>`;
+  const g=$("#bGo"); if(g){g.disabled=!okN;g.textContent=okN?`Сохранить партию (${okN} шт.)`:"Сохранить партию"}
+}
+async function runBatch(){
+  const op=batch.op,p={};
+  if(op==="receive") p.cond=(document.querySelector("input[name=bCond]:checked")||{}).value||"ok";
+  if(op==="ship"){let c=$("#bClient").value;if(c==="__new")c=$("#bNew").value.trim();
+    if(!c){toast("Выберите клиента",1);return}
+    p.client=c;p.doc=$("#bDoc").value.trim();const d=$("#bDue").value;p.due=d?dayStart(d)+DAY-1:null}
+  const todo=batch.rows.filter(r=>r.state==="new"&&!whyNot(units.get(r.code),op));
+  const g=$("#bGo");g.disabled=true;g.textContent="Сохраняю…";busy=true;let n=0;
+  for(const r of todo){try{await api("doAction",r.code,op,p,whoName(),myPin());r.state="done";n++}catch(e){r.state="err";r.msg=e.message;if(/PIN/.test(e.message))break}}
+  busy=false;toast(`Сохранено: ${n} из ${todo.length}`,n<todo.length);await load();updateBatch();
+}
+
+/* ---------- Выгрузки ---------- */
+function renderReports(){
+  if(!isManager()){go("more");return}
+  const t=isoDay(Date.now()),m=isoDay(Date.now()-30*DAY);
+  $("#view").innerHTML=`${backBtn}<div class="stack">
+   <p class="note" style="margin:0">Все данные и так лежат в Google Таблице (листы «Тара» и «Журнал»): её можно открыть и скачать целиком как Excel. Здесь — готовые отчёты.</p>
+   <div class="card"><h2>Остатки сейчас</h2><p class="note" style="margin:0">Сколько где лежит и в каком состоянии, плюс полный список.</p><button class="dark" id="rStock">Скачать Excel</button></div>
+   <div class="card"><h2>Тара у клиентов</h2><p class="note" style="margin:0">Кто что должен вернуть и сколько дней просрочки.</p><button class="dark" id="rDebt">Скачать Excel</button></div>
+   <div class="card"><h2>Движение за период</h2><div class="row"><label class="fld">С<input type="date" id="mFrom" value="${m}"></label><label class="fld">По<input type="date" id="mTo" value="${t}"></label></div><button class="dark" id="rMove">Скачать Excel</button></div>
+   <div class="card"><h2>Акт списания</h2><div class="row"><label class="fld">С<input type="date" id="sFrom" value="${m}"></label><label class="fld">По<input type="date" id="sTo" value="${t}"></label></div><label class="fld">Номер акта<input type="text" id="sNum"></label><button class="dark" id="rScrap">Скачать Excel</button></div></div>`;
+  $("#rStock").onclick=()=>exportStock(sortedUnits());$("#rDebt").onclick=exportDebt;$("#rMove").onclick=exportMoves;$("#rScrap").onclick=exportScrap;
+}
+function saveFile(filename,blob){
+  try{const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}
+  catch(e){toast("Не удалось скачать файл",1)}
+}
+function saveXlsx(filename,sheets){
+  if(window.XLSX){const wb=XLSX.utils.book_new();
+    for(const s of sheets){const ws=XLSX.utils.aoa_to_sheet(s.rows);if(s.cols)ws["!cols"]=s.cols.map(w=>({wch:w}));if(s.merges)ws["!merges"]=s.merges;XLSX.utils.book_append_sheet(wb,ws,s.name.slice(0,31))}
+    saveFile(filename+".xlsx",new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+  }else{saveFile(filename+".csv",new Blob(["﻿"+sheets[0].rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\r\n")],{type:"text/csv;charset=utf-8"}))}
+}
+const stamp=()=>isoDay(Date.now());
+function exportStock(list){
+  if(!list.length){toast("Нет данных",1);return}
+  const act=list.filter(u=>u.loc!=="scrapped"),locs=["wh","line","client","repair"],conds=["ok","dirty","broken"];
+  const sum=[["Остатки тары на "+fDT(Date.now())],[],["Где \\ состояние",...conds.map(c=>COND[c]),"Итого"]];
+  locs.forEach(l=>{const r=conds.map(c=>act.filter(u=>u.loc===l&&u.cond===c).length);sum.push([LOC[l],...r,r.reduce((a,b)=>a+b,0)])});
+  sum.push(["Итого в обороте",...conds.map(c=>act.filter(u=>u.cond===c).length),act.length],["Списано всего","","","",list.length-act.length]);
+  const reg=[["Номер","Тип","Состояние","Где","Клиент","Накладная","Отгружена","Вернуть до","Последнее ТО","В учёте с","Замечания","Демо"]];
+  list.forEach(u=>reg.push([u.code,typeName(u.type),COND[u.cond],LOC[u.loc],u.client||"",u.ship?.doc||"",u.ship?fD(u.ship.date):"",u.ship?fD(u.ship.due):"",fD(u.lastTO),fD(u.created),flags(u).map(f=>f.t).join("; "),u.demo?"да":""]));
+  saveXlsx(`Остатки тары ${stamp()}`,[{name:"Сводка",rows:sum,cols:[22,12,14,14,10]},{name:"Список",rows:reg,cols:[11,24,13,13,22,11,11,11,12,11,30,6]},debtSheet(list)]);
+}
+function debtSheet(list){
+  const rows=[["Номер","Тип","Клиент","Накладная","Отгружена","Вернуть до","Просрочка, дн.","Демо"]];
+  list.filter(u=>u.loc==="client").sort((a,b)=>(a.client||"").localeCompare(b.client||"")||(a.ship?.due||0)-(b.ship?.due||0)).forEach(u=>{const od=u.ship&&u.ship.due<Date.now()?daysSince(u.ship.due):"";rows.push([u.code,typeName(u.type),u.client||"",u.ship?.doc||"",fD(u.ship?.date),fD(u.ship?.due),od,u.demo?"да":""])});
+  return {name:"У клиентов",rows,cols:[11,24,24,11,11,11,14,6]};
+}
+function exportDebt(){const s=debtSheet(sortedUnits());if(s.rows.length<2){toast("Сейчас вся тара у нас");return}
+  const byC={};s.rows.slice(1).forEach(r=>{(byC[r[2]]=byC[r[2]]||{n:0,od:0});byC[r[2]].n++;if(r[6])byC[r[2]].od++});
+  saveXlsx(`Тара у клиентов ${stamp()}`,[{name:"По клиентам",rows:[["Тара у клиентов на "+fDT(Date.now())],[],["Клиент","Всего, шт.","Просрочено, шт."],...Object.entries(byC).map(([c,v])=>[c,v.n,v.od])],cols:[30,12,16]},s])}
+async function periodEvents(f,t){
+  const a=dayStart($(f).value),b=dayStart($(t).value)+DAY-1; if(!(a<=b)){toast("Проверьте даты",1);return null}
+  try{return {list:await api("getEvents",a,b,myPin()),a,b}}catch(e){toast("Не удалось получить данные: "+e.message,1);return null}
+}
+async function exportMoves(){
+  const r=await periodEvents("#mFrom","#mTo");if(!r)return;if(!r.list.length){toast("За период операций нет");return}
+  const rows=[["Дата","Время","Номер","Операция","Откуда","Куда","Состояние","Клиент","Документ","Дефекты","Комментарий","Кто","Демо"]];
+  r.list.forEach(e=>rows.push([fD(e.ts),fT(e.ts),e.code,ACT[e.act]||e.act,LOC[e.from]||"",LOC[e.to]||"",COND[e.cond]||"",e.client||"",e.doc||"",(e.defects||[]).join("; "),[e.reason,e.note].filter(Boolean).join(". "),e.who||"",e.demo?"да":""]));
+  saveXlsx(`Движение тары ${isoDay(r.a)}_${isoDay(r.b)}`,[{name:"Операции",rows,cols:[11,7,11,20,11,11,13,22,11,28,28,18,6]}]);
+}
+async function exportScrap(){
+  const r=await periodEvents("#sFrom","#sTo");if(!r)return;const list=r.list.filter(e=>e.act==="scrap");if(!list.length){toast("За период списаний нет");return}
+  const num=$("#sNum").value.trim();
+  const rows=[[`ООО «${COMPANY}»`],[],[`АКТ № ${num||"____"} на списание многооборотной тары`],[`от ${fD(Date.now())}`],[],
+    ["Комиссия в составе: председатель ____________________, члены комиссии ____________________, ____________________"],
+    [`установила, что перечисленная ниже тара пришла в негодность и подлежит списанию (период ${fD(r.a)} – ${fD(r.b)}).`],[],
+    ["№","Номер тары","Наименование","В учёте с","Дата списания","Причина","Комментарий"]];
+  list.forEach((e,i)=>{const u=units.get(e.code)||{};rows.push([i+1,e.code,typeName(u.type||e.code.split("-")[0]),fD(u.created),fD(e.ts),e.reason||"",e.note||""])});
+  rows.push([],[`Итого: ${list.length} ${plural(list.length,"единица","единицы","единиц")}`],[],["Председатель","","____________","/","____________"],[],["Члены комиссии","","____________","/","____________"],["","","____________","/","____________"]);
+  saveXlsx(`Акт списания ${num||stamp()}`,[{name:"Акт",rows,cols:[6,12,26,12,13,24,30],merges:[0,2,3,5,6].map(r=>({s:{r,c:0},e:{r,c:6}}))}]);
+}
+
+/* ---------- Настройки ---------- */
+function renderSettings(){
+  const demo=[...units.values()].filter(u=>u.demo).length;
+  $("#view").innerHTML=`${backBtn}<div class="stack">
+   <div class="card"><h2>Кто работает на этом устройстве</h2><input type="text" id="sWho" value="${esc(whoName())}" placeholder="Фамилия или должность"><button class="primary" id="sWhoSave">Сохранить</button><p class="note" style="margin:0">Записывается в историю каждой операции. Запоминается только на этом устройстве.</p></div>
+   ${cfg.needPin||cfg.hasManagerPin?`<div class="card"><h2>PIN</h2><p style="margin:0">Сейчас: <b>${role==="manager"?"руководитель":role==="worker"?"сотрудник":"только просмотр"}</b></p><input type="password" id="sPin" value="${esc(myPin())}" inputmode="numeric" placeholder="Введите PIN"><button id="sPinSave">Сохранить PIN</button><p class="note" style="margin:0">PIN выдаёт руководитель. Запоминается на этом устройстве.</p></div>`:""}
+   <div class="card"><h2>Клиенты</h2><div class="row" style="gap:6px">${cfg.clients.map(c=>`<span class="pill" style="flex:0 0 auto${isManager()?"":";padding-right:12px"}">${esc(c)}${isManager()?`<button data-rmclient="${esc(c)}" aria-label="Удалить">✕</button>`:""}</span>`).join("")||`<span class="note">Пока нет</span>`}</div><div class="row"><input type="text" id="sClient" placeholder="Название клиента"><button id="sClientAdd" style="flex:0 0 auto">Добавить</button></div></div>
+   ${isManager()?`<div class="card"><h2>Сроки</h2><div class="row"><label class="fld">Вернуть от клиента за, дней<input type="number" id="sRet" value="${cfg.returnDays}" inputmode="numeric"></label><label class="fld">ТО каждые, дней (0 — не следить)<input type="number" id="sTo" value="${cfg.toDays}" inputmode="numeric"></label></div><button id="sDays">Сохранить сроки</button></div>
+   <div class="card"><h2>Типы тары</h2>${cfg.types.map(t=>`<div>${esc(t.name)} — номера ${esc(t.prefix)}-00001…</div>`).join("")}<div class="row"><input type="text" id="sTName" placeholder="Название"><input type="text" id="sTPref" maxlength="4" placeholder="Буквы, напр. MS"></div><button id="sTAdd">Добавить тип</button><p class="note" style="margin:0">В номере только латинские буквы — так QR одинаково читают ТСД и телефоны.</p></div>
+   <div class="card"><h2>Демо-данные</h2>${demo?`<p class="note" style="margin:0">${demo} ${plural(demo,"пример","примера","примеров")} для пробы. Удалите перед началом работы.</p><div id="demoArea"><button class="danger" id="demoAsk">Удалить демо-данные</button></div>`:`<p class="note" style="margin:0">Демо-данных нет.</p>`}</div>`:""}
+   ${SHEET_URL?`<p class="note" style="margin:0">Таблица с данными (откроется только у тех, кому вы дали к ней доступ): <a href="${esc(SHEET_URL)}" target="_blank" rel="noopener">открыть Google Таблицу</a></p>`:""}
+  </div>`;
+  const call=async(btn,fn,...a)=>{btn.disabled=true;busy=true;try{await api(fn,...a);toast("Сохранено");await load();busy=false;renderSettings()}catch(e){toast("Не сохранено: "+e.message,1);btn.disabled=false;busy=false}};
+  $("#sWhoSave").onclick=()=>{lsSet("tara.who",$("#sWho").value.trim());toast("Сохранено");renderBanners()};
+  const sp=$("#sPinSave"); if(sp) sp.onclick=async()=>{lsSet("tara.pin",$("#sPin").value.trim());await load();toast(role==="guest"?"PIN не подходит":role==="manager"?"Вы вошли как руководитель":"Вы вошли как сотрудник",role==="guest");renderSettings()};
+  $("#sClientAdd").onclick=e=>{const v=$("#sClient").value.trim();if(v)call(e.target,"addClient",v,myPin())};
+  if(isManager()){$("#sDays").onclick=e=>call(e.target,"saveSettings",+$("#sRet").value||30,Math.max(0,+$("#sTo").value||0),myPin());
+  $("#sTAdd").onclick=e=>{const n=$("#sTName").value.trim(),p=$("#sTPref").value.trim().toUpperCase();
+    if(!n||!/^[A-Z]{1,4}$/.test(p)){toast("Нужно название и 1–4 латинские буквы",1);return}
+    call(e.target,"addType",p,n,myPin())};}
+  const a=$("#demoAsk"); if(a) a.onclick=()=>{$("#demoArea").innerHTML=`<div class="confirm">Удалить все демо-примеры и их историю? Настоящая тара не пострадает.<div class="row"><button class="danger" id="demoYes">Да, удалить</button><button id="demoNo">Отмена</button></div></div>`;$("#demoNo").onclick=renderSettings;$("#demoYes").onclick=e=>call(e.target,"deleteDemo",myPin())};
+}
+
+/* ========== Камера ========== */
+$("#photoInput").onchange=async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  if(typeof jsQR!=="function"){toast("Распознавание не загрузилось",1);return}
+  try{const url=URL.createObjectURL(f),img=new Image();await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url});
+    const k=Math.min(1,1400/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.round(img.naturalWidth*k),h=Math.round(img.naturalHeight*k);
+    const cv=document.createElement("canvas");cv.width=w;cv.height=h;const cx=cv.getContext("2d");cx.drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+    const r=jsQR(cx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:"attemptBoth"});
+    if(r&&r.data)handleScan(r.data);else toast("QR не найден — снимите ближе",1)}catch(err){toast("Не удалось прочитать фото",1)}
+};
+/* ТСД в режиме клавиатуры: символы, набранные вне полей ввода, собираются в буфер; Enter — открыть карточку */
+let kbuf="",ktimer=0;
+document.addEventListener("keydown",e=>{
+  const t=e.target;if(t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.tagName==="SELECT"||t.isContentEditable))return;
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key==="Enter"&&kbuf){e.preventDefault();const v=kbuf;kbuf="";handleScan(v);return}
+  if(e.key.length===1){kbuf+=e.key;clearTimeout(ktimer);ktimer=setTimeout(()=>kbuf="",800);e.preventDefault()}
+});
+
+/* ========== Клики ========== */
+document.addEventListener("click",e=>{
+  const o=e.target.closest("[data-open]");if(o){openCard(o.dataset.open);return}
+  const p=e.target.closest("[data-pan]");if(p){setPanel(p.dataset.pan);return}
+  const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);return}
+  const n2=e.target.closest("[data-nav2]");if(n2){go(n2.dataset.nav2);return}
+  const fl=e.target.closest("[data-flt]");if(fl){listFilter=fl.dataset.flt;listQ="";go("list");return}
+  const lf=e.target.closest("[data-lf]");if(lf){listFilter=lf.dataset.lf;document.querySelectorAll("[data-lf]").forEach(b=>b.setAttribute("aria-pressed",b===lf));listBody();return}
+  const lb=e.target.closest("[data-label]");if(lb){labelsPdf([lb.dataset.label],"t58",lb);return}
+  const br=e.target.closest("[data-brm]");if(br){batch.rows=batch.rows.filter(r=>r.code!==br.dataset.brm);updateBatch();return}
+  const rc=e.target.closest("[data-rmclient]");if(rc){rc.disabled=true;api("removeClient",rc.dataset.rmclient,myPin()).then(load).then(()=>view==="settings"&&renderSettings()).catch(er=>toast("Не удалено: "+er.message,1));return}
+});
+
+/* ========== Старт: открытие по ссылке из QR (…/exec?c=MK-00003) ========== */
+if(LOGO_SRC){const im=new Image();im.className="logo";im.alt="";im.src=LOGO_SRC;im.onload=()=>{const sl=$("#logoSlot");sl.innerHTML="";sl.appendChild(im)}}
+render();
+{const c=new URLSearchParams(location.search).get("c");if(c){const code=parseCode(c);if(code)pendingCode=code}}
+load();
+</script>
+</body>
+</html>
